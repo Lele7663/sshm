@@ -1,0 +1,17 @@
+pkgbase = sshm
+	pkgdesc = A modern, user-friendly TUI for managing SSH connections
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/lele7663/sshm
+	arch = any
+	license = MIT
+	depends = python>=3.8
+	depends = python-textual
+	depends = python-cryptography
+	depends = python-paramiko
+	depends = sshpass
+	makedepends = python-setuptools
+	source = sshm-0.1.0.tar.gz::https://github.com/lele7663/sshm/archive/v0.1.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = sshm 
