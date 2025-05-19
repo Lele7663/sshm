@@ -224,7 +224,7 @@ class SSHManagerUI:
         header = "SSH Manager"
         if self.current_path:
             header += f" - {'/'.join(self.current_path)}"
-        header += " - Use ↑↓ to navigate, 'c' to connect, 's' for SFTP, 'a' to add, 'e' to edit, 'd' to delete, 'q' to quit"
+        header += " - Use ↑↓ to navigate, 'c' to connect, 's' for SFTP, 'k' to copy SSH key, 'a' to add, 'e' to edit, 'd' to delete, 'q' to quit"
         stdscr.addstr(0, 0, header)
         
         # Build and draw items
@@ -386,6 +386,11 @@ class SSHManagerUI:
             if item_type == "config":
                 self.show_message(f"Starting SFTP session with {data.host}...")
                 self.connect_to_sftp(data)
+        elif key == ord('k') and self.display_items:
+            item, item_type, data = self.display_items[self.current_index]
+            if item_type == "config":
+                self.show_message(f"Copying SSH key to {data.host}...")
+                self.connect_to_ssh_copy_id(data)
         return True
 
     def handle_add_input(self, stdscr, key):
@@ -564,6 +569,72 @@ class SSHManagerUI:
                 
         except Exception as e:
             print(f"SFTP connection failed: {str(e)}")
+            if config.password:
+                print("Note: Make sure 'sshpass' is installed on your system.")
+                print("On Ubuntu/Debian: sudo apt-get install sshpass")
+                print("On Fedora: sudo dnf install sshpass")
+                print("On Arch: sudo pacman -S sshpass")
+            
+            # Restart curses
+            stdscr = curses.initscr()
+            curses.start_color()
+            curses.use_default_colors()
+            curses.curs_set(0)
+            stdscr.keypad(1)
+
+    def connect_to_ssh_copy_id(self, config: SSHConfig):
+        # Build ssh-copy-id command
+        cmd = ["ssh-copy-id"]
+        
+        # Add port if not default
+        if config.port != 22:
+            cmd.extend(["-p", str(config.port)])
+        
+        # Add identity file if specified
+        if config.key_path:
+            cmd.extend(["-i", config.key_path])
+        
+        # Add username and host
+        cmd.append(f"{config.username}@{config.host}")
+        
+        # End curses and restore terminal state
+        curses.endwin()
+        curses.curs_set(1)  # Show cursor
+        curses.echo()       # Enable echo
+        
+        try:
+            if config.password:
+                # Use sshpass for password authentication
+                cmd = ["sshpass", "-e"] + cmd
+                # Set the password as an environment variable
+                env = os.environ.copy()
+                env["SSHPASS"] = config.password
+            
+                # Execute ssh-copy-id command in a new process
+                process = subprocess.Popen(cmd, env=env)
+                process.wait()
+            else:
+                # Execute ssh-copy-id command in a new process without password
+                process = subprocess.Popen(cmd)
+                process.wait()
+            
+            # Restart curses
+            stdscr = curses.initscr()
+            curses.start_color()
+            curses.use_default_colors()
+            curses.curs_set(0)
+            stdscr.keypad(1)
+            
+            if process.returncode != 0:
+                if process.returncode == 6:
+                    self.show_message("Authentication failed - check username and password")
+                else:
+                    self.show_message(f"Key copy failed with exit code {process.returncode}")
+            else:
+                self.show_message("SSH key successfully copied to remote host")
+                
+        except Exception as e:
+            print(f"Key copy failed: {str(e)}")
             if config.password:
                 print("Note: Make sure 'sshpass' is installed on your system.")
                 print("On Ubuntu/Debian: sudo apt-get install sshpass")
